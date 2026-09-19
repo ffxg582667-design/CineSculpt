@@ -34,7 +34,7 @@ def main():
                 out = os.path.join(os.path.dirname(img), "cut_%d.png" % i)
                 cut.append(segment.extract_subject(img, out))  # rembg 未装时自动退回原图
             imgs = cut
-        model_path, source = reconstruct.reconstruct(
+        model_path, source, fallback_reason = reconstruct.reconstruct(
             imgs, mode=mode, public_image_urls=None,
             api_key=os.environ.get("TRIPO_API_KEY"))
         out_glb = os.path.join(OUT, sid + ".glb")
@@ -42,7 +42,7 @@ def main():
         m = mesh_ops.normalize_size(m)
         m.export(out_glb)
         chk = mesh_ops.print_check(m)
-        msg = "重建完成" if source == "real" else "已用占位模型演示（未配置重建 API）"
+        msg = "重建完成" if source == "real" else fallback_reason
         write("done", result={"success": True, "session_id": sid,
             "model_url": "/api/model/" + sid, "source": source,
             "print_check": chk, "message": msg, "ai_note": ai_note})

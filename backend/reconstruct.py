@@ -27,12 +27,12 @@ def reconstruct(image_paths, mode="hero", public_image_urls=None, api_key=None):
     tripo_key = api_key or os.environ.get("TRIPO_API_KEY")
     if tripo_key:
         try:
-            return _reconstruct_tripo(image_paths, tripo_key), "real"
+            return _reconstruct_tripo(image_paths, tripo_key), "real", ""
         except Exception as e:
             # Key 失效/额度耗尽/网络异常时优雅降级为占位模型，保证演示流程不中断
             print("Tripo 真实生成失败，降级为占位模型:", e, flush=True)
-            return get_fallback_model_path(), "fallback"
-    return get_fallback_model_path(), "fallback"
+            return get_fallback_model_path(), "fallback", "重建 API 调用失败（" + str(e)[:120] + "），已降级为占位模型演示"
+    return get_fallback_model_path(), "fallback", "未配置重建 API（TRIPO_API_KEY），已用占位模型演示"
 
 def _reconstruct_tripo(image_paths, api_key):
     # use official Tripo3D SDK. multi-image for >=2 imgs, else single image.
