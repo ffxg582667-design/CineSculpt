@@ -12,7 +12,7 @@ scipy>=1.11
 networkx>=3.0
 
 # 3D 重建
-tripo3d>=1.0
+tripo3d>=0.4.0
 
 # rembg 用于「抠主体」(u2net 模型, 约 180MB, 内存占用较大)。
 # 若 Render 免费档(512MB) 部署报 Out of memory，删掉下面这行重新部署即可：
