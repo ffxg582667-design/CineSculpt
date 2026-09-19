@@ -1,0 +1,22 @@
+# API keys / secrets (contain API keys - never commit)
+start.bat
+
+# uploaded images and generated models (large, regenerable)
+uploads/
+output/
+models/
+
+# tunnel log (contains public url)
+tunnel.log
+
+# python cache
+__pycache__/
+*.pyc
+
+# temp test files
+_*.py
+*_out.txt
+*_err.txt
+
+run_server.py
+backend/run_server.py

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CineSculpt - 电影场景 3D 打印</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script type="importmap">
+    {
+      "imports": {
+        "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+        "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+      }
+    }
+    </script>
+</head>
+<body>
+    <div class="app">
+        <header>
+            <h1>CineSculpt</h1>
+            <p>上传电影场景截图，把感动变成能放在书桌上的实体摆件</p>
+        </header>
+        <div class="main">
+            <div class="left-panel">
+                <section class="card">
+                    <h3>1. 上传场景截图</h3>
+                    <label for="fileInput" class="upload-label" id="uploadLabel">
+                        <span class="plus">+</span>
+                        <span id="uploadText">选择 4-5 张不同角度截图</span>
+                        <span class="hint">支持 JPG / PNG，最多 5 张</span>
+                    </label>
+                    <input type="file" id="fileInput" accept="image/*" multiple>
+                    <div id="thumbs" class="thumbs"></div>
+                    <div class="source-box">
+                        <label class="source-label">这是什么？（选填，填了效果更好）</label>
+                        <input type="text" id="sourceInput" placeholder="例如：星际穿越 永恒号飞船">
+                        <p class="source-tip">填写后，AI 会联网理解这个东西再生成（文字驱动）；不填则用图片生成。</p>
+                    </div>
+                </section>
+                <section class="card">
+                    <h3>2. 选择模式</h3>
+                    <div class="mode-row">
+                        <button class="mode-btn active" id="heroBtn">主角模式<br><small>单主体，细节清晰</small></button>
+                        <button class="mode-btn" id="sceneBtn">场景模式<br><small>全景，细节略糊</small></button>
+                    </div>
+                    <button id="reconstructBtn" class="primary-btn">开始重建 3D</button>
+                    <div id="reconMsg" class="msg"></div>
+                </section>
+                <section class="card" id="tuneCard" style="display:none;">
+                    <h3>3. AI 修理</h3>
+                    <p class="tune-hint">自动去除碎片、补洞、修复法线，让模型水密可打印。</p>
+                    <button id="repairBtn" class="primary-btn">AI 一键修理</button>
+                    <div id="repairMsg" class="msg"></div>
+                </section>
+                <section class="card" id="manualCard" style="display:none;">
+                    <h3>4. 人工微调</h3>
+                    <div class="tune-row">
+                        <label>加底座</label>
+                        <select id="baseSel"><option value="">无</option><option value="cylinder">圆柱</option><option value="box">方形</option></select>
+                    </div>
+                    <div class="tune-row">
+                        <label>目标高度(mm)</label>
+                        <input type="number" id="heightInput" value="100" min="10" max="200">
+                    </div>
+                    <div class="tune-row">
+                        <label>网格简化<span id="simVal">50%</span></label>
+                        <input type="range" id="simRange" min="0.1" max="1" step="0.1" value="0.5">
+                    </div>
+                    <button id="tuneBtn" class="primary-btn">应用人工微调</button>
+                </section>
+                <section class="card" id="exportCard" style="display:none;">
+                    <h3>4. 导出</h3>
+                    <button id="exportBtn" class="primary-btn">导出 STL 文件</button>
+                    <div id="exportMsg" class="msg"></div>
+                </section>
+            </div>
+            <div class="right-panel">
+                <div id="viewer"><span class="placeholder">3D 模型预览区<br>重建后可旋转、缩放查看</span></div>
+                <div id="printCheck" class="print-check"></div>
+            </div>
+        </div>
+        <footer>CineSculpt - MakerMuse 黑客松 - 把电影记忆实体化</footer>
+    </div>
+    <script type="module" src="app.js"></script>
+</body>
+</html>

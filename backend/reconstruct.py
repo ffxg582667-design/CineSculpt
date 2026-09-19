@@ -1,0 +1,97 @@
+# -*- coding: utf-8 -*-
+# 3D reconstruction pluggable interface: Tripo3D (real) / local placeholder (fallback)
+import os
+import uuid
+import asyncio
+import trimesh
+
+MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models")
+OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")
+os.makedirs(MODELS_DIR, exist_ok=True)
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+
+def _make_placeholder_model():
+    sphere = trimesh.creation.icosphere(subdivisions=3, radius=1.0)
+    box = trimesh.creation.box(extents=(1.2, 1.2, 0.4))
+    box.apply_translation((0, 0, -1.0))
+    return trimesh.util.concatenate([sphere, box])
+
+def get_fallback_model_path():
+    path = os.path.join(MODELS_DIR, "placeholder.glb")
+    if not os.path.exists(path):
+        _make_placeholder_model().export(path)
+    return path
+
+def reconstruct(image_paths, mode="hero", public_image_urls=None):
+    # priority: Tripo3D -> fallback placeholder
+    tripo_key = os.environ.get("TRIPO_API_KEY")
+    if tripo_key:
+        try:
+            return _reconstruct_tripo(image_paths, tripo_key), "real"
+        except Exception as e:
+            print("Tripo3D reconstruct failed, fallback:", e)
+    return get_fallback_model_path(), "fallback"
+
+def _reconstruct_tripo(image_paths, api_key):
+    # use official Tripo3D SDK. multi-image for >=2 imgs, else single image.
+    return asyncio.run(_tripo_async(image_paths, api_key))
+
+async def _tripo_async(image_paths, api_key):
+    from tripo3d import TripoClient, TaskStatus
+    async with TripoClient(api_key=api_key) as client:
+        imgs = [p for p in image_paths if os.path.exists(p)]
+        if not imgs:
+            raise Exception("no valid image")
+        # use single-image reconstruction (most reliable). multiview API params are strict.
+        task_id = await client.image_to_model(image=imgs[0])
+        task = await client.wait_for_task(task_id, polling_interval=3.0, timeout=300, verbose=True)
+        if task.status != TaskStatus.SUCCESS:
+            raise Exception("tripo task not success: " + str(task.status))
+        out_dir = os.path.join(OUTPUT_DIR, "tripo_" + uuid.uuid4().hex)
+        os.makedirs(out_dir, exist_ok=True)
+        files = await client.download_task_models(task, out_dir)
+        # pick glb if available, else first file
+        model_path = None
+        for k, v in files.items():
+            if v and str(v).lower().endswith(".glb"):
+                model_path = v; break
+        if not model_path:
+            for k, v in files.items():
+                if v:
+                    model_path = v; break
+        if not model_path:
+            raise Exception("no model file downloaded")
+        return model_path
+
+def reconstruct_from_text(prompt, api_key=None):
+    # text-to-3D via Tripo. returns (model_path, source).
+    key = api_key or os.environ.get("TRIPO_API_KEY")
+    if not key:
+        return get_fallback_model_path(), "fallback"
+    try:
+        return asyncio.run(_tripo_text_async(prompt, key)), "real"
+    except Exception as e:
+        print("Tripo text-to-3d failed, fallback:", e)
+        return get_fallback_model_path(), "fallback"
+
+async def _tripo_text_async(prompt, api_key):
+    from tripo3d import TripoClient, TaskStatus
+    async with TripoClient(api_key=api_key) as client:
+        task_id = await client.text_to_model(prompt=prompt)
+        task = await client.wait_for_task(task_id, polling_interval=3.0, timeout=300, verbose=True)
+        if task.status != TaskStatus.SUCCESS:
+            raise Exception("tripo text task not success: " + str(task.status))
+        out_dir = os.path.join(OUTPUT_DIR, "tripo_" + uuid.uuid4().hex)
+        os.makedirs(out_dir, exist_ok=True)
+        files = await client.download_task_models(task, out_dir)
+        model_path = None
+        for k, v in files.items():
+            if v and str(v).lower().endswith(".glb"):
+                model_path = v; break
+        if not model_path:
+            for k, v in files.items():
+                if v:
+                    model_path = v; break
+        if not model_path:
+            raise Exception("no model file downloaded")
+        return model_path

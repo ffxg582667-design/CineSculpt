@@ -1,0 +1,184 @@
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+
+let sessionId = null;
+let reconstructedSid = null;  // lock the session that has a built model
+let mode = "hero";
+let scene, camera, renderer, controls, currentMesh;
+let pickedFiles = [];
+
+const fileInput = document.getElementById("fileInput");
+const uploadLabel = document.getElementById("uploadLabel");
+const uploadText = document.getElementById("uploadText");
+const thumbs = document.getElementById("thumbs");
+
+fileInput.addEventListener("change", () => {
+    const newFiles = Array.from(fileInput.files);
+    for (const f of newFiles) {
+        if (pickedFiles.length >= 5) { alert("最多 5 张"); break; }
+        pickedFiles.push(f);
+    }
+    fileInput.value = "";
+    renderThumbs();
+    if (pickedFiles.length > 0) uploadSession();
+});
+
+function renderThumbs() {
+    thumbs.innerHTML = "";
+    pickedFiles.forEach((f, idx) => {
+        const wrap = document.createElement("div");
+        wrap.className = "thumb";
+        const img = document.createElement("img");
+        img.src = URL.createObjectURL(f);
+        const del = document.createElement("span");
+        del.className = "thumb-del";
+        del.textContent = "x";
+        del.addEventListener("click", () => { pickedFiles.splice(idx, 1); renderThumbs(); if (pickedFiles.length>0) uploadSession(); });
+        wrap.appendChild(img);
+        wrap.appendChild(del);
+        thumbs.appendChild(wrap);
+    });
+    if (pickedFiles.length > 0) {
+        uploadText.textContent = "已选择 " + pickedFiles.length + " 张（可继续添加）";
+        uploadLabel.classList.add("has-file");
+    } else {
+        uploadText.textContent = "选择 4-5 张不同角度截图";
+        uploadLabel.classList.remove("has-file");
+    }
+}
+
+function uploadSession() {
+    const fd = new FormData();
+    pickedFiles.forEach(f => fd.append("files", f));
+    fetch("/api/upload", { method:"POST", body:fd })
+        .then(r => r.json()).then(d => {
+            if (d.success) { sessionId = d.session_id; }
+            else alert(d.error);
+        });
+}
+
+document.getElementById("heroBtn").addEventListener("click", () => setMode("hero"));
+document.getElementById("sceneBtn").addEventListener("click", () => setMode("scene"));
+function setMode(m) {
+    mode = m;
+    document.getElementById("heroBtn").classList.toggle("active", m==="hero");
+    document.getElementById("sceneBtn").classList.toggle("active", m==="scene");
+}
+
+document.getElementById("reconstructBtn").addEventListener("click", () => {
+    if (!sessionId) { alert("请先上传图片"); return; }
+    const btn = document.getElementById("reconstructBtn");
+    const msg = document.getElementById("reconMsg");
+    btn.disabled = true; msg.textContent = "正在重建，请稍候...";
+    fetch("/api/reconstruct", { method:"POST", headers:{"Content-Type":"application/json"},
+        body: JSON.stringify({ session_id:sessionId, mode:mode, keep_subject: mode==="hero", source_text: (document.getElementById("sourceInput") ? document.getElementById("sourceInput").value : "") }) })
+        .then(r => r.json()).then(d => {
+            btn.disabled = false;
+            if (d.success) {
+                reconstructedSid = d.session_id;
+                msg.textContent = d.message + (d.prompt ? "｜AI理解：" + d.prompt : "");
+                loadModel(d.model_url);
+                showPrintCheck(d.print_check);
+                document.getElementById("tuneCard").style.display = "block";
+                document.getElementById("manualCard").style.display = "block";
+                document.getElementById("exportCard").style.display = "block";
+            } else { msg.textContent = "错误: " + d.error; }
+        }).catch(e => { btn.disabled=false; msg.textContent="重建失败"; });
+});
+
+document.getElementById("simRange").addEventListener("input", e => {
+    document.getElementById("simVal").textContent = Math.round(e.target.value*100) + "%";
+});
+document.getElementById("repairBtn").addEventListener("click", () => {
+    if (!reconstructedSid) { alert("请先完成重建"); return; }
+    const btn = document.getElementById("repairBtn");
+    const msg = document.getElementById("repairMsg");
+    btn.disabled = true; msg.textContent = "AI 正在修理（去碎片/补洞/水密）...";
+    fetch("/api/repair", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({session_id:reconstructedSid}) })
+        .then(r => r.json()).then(d => {
+            btn.disabled = false;
+            if (d.success) {
+                loadModel(d.model_url + "?t=" + Date.now());
+                showPrintCheck(d.print_check);
+                const rep = d.repair_report || {};
+                msg.textContent = "修理完成：去除碎片 " + (rep.components_removed||0) + " 个，补洞 " + (rep.holes_before||0) + " 处，水密：" + (rep.watertight ? "是" : "否");
+            } else { msg.textContent = "错误: " + d.error; }
+        }).catch(e => { btn.disabled=false; msg.textContent="修理失败"; });
+});
+
+document.getElementById("tuneBtn").addEventListener("click", () => {
+    if (!reconstructedSid) { alert("请先完成重建"); return; }
+    const body = {
+        session_id: reconstructedSid,
+        add_base: document.getElementById("baseSel").value,
+        target_height_mm: document.getElementById("heightInput").value,
+        simplify_ratio: document.getElementById("simRange").value
+    };
+    fetch("/api/tune", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify(body) })
+        .then(r => r.json()).then(d => {
+            if (d.success) { loadModel(d.model_url + "?t=" + Date.now()); showPrintCheck(d.print_check); }
+            else alert(d.error);
+        });
+});
+
+document.getElementById("exportBtn").addEventListener("click", () => {
+    const msg = document.getElementById("exportMsg");
+    msg.textContent = "正在生成 STL...";
+    fetch("/api/export", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({session_id:reconstructedSid}) })
+        .then(r => r.json()).then(d => {
+            if (d.success) {
+                msg.textContent = "文件已生成！";
+                const a = document.createElement("a");
+                a.href = d.stl_url;
+                a.textContent = "点击下载 STL（可发送至 MakerMuse 云打印）";
+                a.style.color = "#c86cff"; a.style.marginLeft = "6px";
+                msg.appendChild(a);
+            } else { msg.textContent = d.error; }
+        });
+});
+
+function showPrintCheck(chk) {
+    if (!chk) return;
+    const el = document.getElementById("printCheck");
+    let html = "打印性检测：尺寸 " + chk.size_mm.join(" x ") + " mm，最小特征 " + chk.min_feature_mm + " mm。";
+    if (chk.warnings && chk.warnings.length) {
+        html += "<br>提示：" + chk.warnings.join("；");
+        el.className = "print-check warn";
+    } else {
+        html += " 可正常打印。";
+        el.className = "print-check ok";
+    }
+    el.innerHTML = html;
+}
+
+function initViewer() {
+    const viewer = document.getElementById("viewer");
+    scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x141530);
+    camera = new THREE.PerspectiveCamera(45, viewer.clientWidth/viewer.clientHeight, 0.1, 1000);
+    camera.position.set(3, 2, 4);
+    renderer = new THREE.WebGLRenderer({ antialias:true });
+    renderer.setSize(viewer.clientWidth, viewer.clientHeight);
+    viewer.innerHTML = "";
+    viewer.appendChild(renderer.domElement);
+    controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const dl = new THREE.DirectionalLight(0xffffff, 0.8); dl.position.set(5,10,7); scene.add(dl);
+    animate();
+}
+function animate() { requestAnimationFrame(animate); if (controls) controls.update(); if (renderer) renderer.render(scene, camera); }
+
+function loadModel(url) {
+    if (!scene) initViewer();
+    if (currentMesh) { scene.remove(currentMesh); }
+    const loader = new GLTFLoader();
+    loader.load(url, (gltf) => {
+        currentMesh = gltf.scene;
+        const box = new THREE.Box3().setFromObject(currentMesh);
+        const center = box.getCenter(new THREE.Vector3());
+        currentMesh.position.sub(center);
+        scene.add(currentMesh);
+    }, undefined, (err) => { console.error(err); });
+}

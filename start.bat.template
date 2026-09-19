@@ -1,0 +1,27 @@
+@echo off
+chcp 65001 >nul
+echo ========================================
+echo    CineSculpt - Movie Scene 3D Print
+echo ========================================
+cd /d %~dp0
+taskkill /F /IM cloudflared.exe >nul 2>&1
+
+REM ==== fill in your own API keys below ====
+set TRIPO_API_KEY=YOUR_TRIPO_KEY_HERE
+set DEEPSEEK_API_KEY=YOUR_DEEPSEEK_KEY_HERE
+
+start "" /B python backend\app.py
+echo [1/3] backend starting, wait 8s...
+timeout /t 8 /nobreak >nul
+echo [2/3] starting public tunnel...
+if exist tunnel.log del tunnel.log
+start "" /B cloudflared tunnel --url http://localhost:5001 --logfile tunnel.log
+echo [3/3] waiting for public url (about 15s)...
+timeout /t 15 /nobreak >nul
+echo.
+echo    Local:  http://localhost:5001
+echo    Public URL:
+findstr /C:"trycloudflare.com" tunnel.log
+echo.
+echo To stop, run stop.bat
+pause
