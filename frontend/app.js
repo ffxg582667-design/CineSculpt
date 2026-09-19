@@ -102,7 +102,9 @@ function pollReconstruct(btn, msg, tries) {
                 document.getElementById("exportCard").style.display = "block";
             } else if (d.status === "error") {
                 btn.disabled = false;
-                msg.textContent = "错误: " + d.error;
+                let t = "错误: " + d.error;
+                if (d.worker_log) t += "｜日志: " + String(d.worker_log).slice(0, 150);
+                msg.textContent = t;
             } else {
                 msg.textContent = "AI 生成中... 已等待 " + (tries * 3) + " 秒（Tripo 通常 1-2 分钟）";
                 setTimeout(() => pollReconstruct(btn, msg, tries + 1), 3000);

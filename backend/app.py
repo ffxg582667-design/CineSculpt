@@ -4,6 +4,7 @@ import os
 import sys
 import uuid
 import json
+import time
 import subprocess
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
@@ -25,7 +26,20 @@ os.makedirs(OUTPUT, exist_ok=True)
 ALLOWED = {"png", "jpg", "jpeg", "bmp", "tiff", "tif"}
 SESSIONS = {}
 JOBS = {}  # sid -> {"status": "processing"|"done"|"error", ...}
-APP_VERSION = "20260919-3"  # 用于在 /api/status 确认最新代码已部署
+APP_VERSION = "20260919-4"  # 用于在 /api/status 确认最新代码已部署
+
+# 重启诊断：boot_count 在同容器内递增；若变回 1，说明容器被整体替换（磁盘被清空）
+BOOT_TIME = time.strftime("%Y-%m-%d %H:%M:%S")
+try:
+    _bc = int(open(os.path.join(OUTPUT, "boot_count.txt")).read().strip() or "0")
+except Exception:
+    _bc = 0
+BOOT_COUNT = _bc + 1
+try:
+    with open(os.path.join(OUTPUT, "boot_count.txt"), "w") as _f:
+        _f.write(str(BOOT_COUNT))
+except Exception:
+    pass
 
 def allowed(fn):
     return "." in fn and fn.rsplit(".", 1)[1].lower() in ALLOWED
@@ -102,11 +116,12 @@ def api_reconstruct():
     if os.path.exists(result_path):
         os.remove(result_path)
     try:
+        log_f = open(os.path.join(OUTPUT, sid + "_worker.log"), "w")
         subprocess.Popen(
             [sys.executable, os.path.join(BASE, "worker_runner.py"),
              sid, mode, str(keep_subject), json.dumps(images), source_text,
              tripo_key, llm_key, llm_base, llm_model],
-            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+            stdout=log_f, stderr=subprocess.STDOUT,
         )
     except Exception as e:
         return jsonify({"error": "无法启动生成任务: " + str(e)}), 500
@@ -133,7 +148,17 @@ def api_reconstruct_status():
     job = JOBS.get(sid)
     if job:
         return jsonify(job)
-    return jsonify({"status": "error", "error": "任务不存在（服务可能已重启），请重新上传并重建"}), 404
+    # 诊断信息：带上子进程日志尾部，帮助定位“任务不存在”的真实原因
+    tail = ""
+    log_path = os.path.join(OUTPUT, sid + "_worker.log")
+    if os.path.exists(log_path):
+        try:
+            tail = open(log_path, encoding="utf-8", errors="replace").read()[-300:]
+        except Exception:
+            pass
+    return jsonify({"status": "error", "boot_time": BOOT_TIME, "boot_count": BOOT_COUNT,
+        "error": "任务不存在（服务可能已重启），请重新上传并重建",
+        "worker_log": tail}), 404
 
 @app.route("/api/tune", methods=["POST"])
 def api_tune():
@@ -177,7 +202,7 @@ def api_repair():
 @app.route("/api/status")
 def api_status():
     import os as _os
-    return jsonify({"version": APP_VERSION,
+    return jsonify({"version": APP_VERSION, "boot_time": BOOT_TIME, "boot_count": BOOT_COUNT,
         "tripo_key_configured": bool(_os.environ.get("TRIPO_API_KEY")),
         "deepseek_key_configured": bool(_os.environ.get("DEEPSEEK_API_KEY"))})
 
