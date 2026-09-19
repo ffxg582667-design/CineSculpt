@@ -26,8 +26,12 @@ def reconstruct(image_paths, mode="hero", public_image_urls=None, api_key=None):
     # priority: user-provided key -> server env key -> fallback placeholder
     tripo_key = api_key or os.environ.get("TRIPO_API_KEY")
     if tripo_key:
-        # 有 Key 时不再静默降级：把真实错误抛出，便于排查（如鉴权失败/额度耗尽）
-        return _reconstruct_tripo(image_paths, tripo_key), "real"
+        try:
+            return _reconstruct_tripo(image_paths, tripo_key), "real"
+        except Exception as e:
+            # Key 失效/额度耗尽/网络异常时优雅降级为占位模型，保证演示流程不中断
+            print("Tripo 真实生成失败，降级为占位模型:", e, flush=True)
+            return get_fallback_model_path(), "fallback"
     return get_fallback_model_path(), "fallback"
 
 def _reconstruct_tripo(image_paths, api_key):
