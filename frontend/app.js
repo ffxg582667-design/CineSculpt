@@ -72,12 +72,12 @@ document.getElementById("reconstructBtn").addEventListener("click", () => {
     const msg = document.getElementById("reconMsg");
     btn.disabled = true; msg.textContent = "正在重建，请稍候...";
     fetch("/api/reconstruct", { method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({ session_id:sessionId, mode:mode, keep_subject: mode==="hero", source_text: (document.getElementById("sourceInput") ? document.getElementById("sourceInput").value : "") }) })
+        body: JSON.stringify({ session_id:sessionId, mode:mode, keep_subject: mode==="hero", source_text: (document.getElementById("sourceInput") ? document.getElementById("sourceInput").value : ""), tripo_key: getUserKeys().tripo_key, llm_key: getUserKeys().llm_key, llm_base: getUserKeys().llm_base, llm_model: getUserKeys().llm_model }) })
         .then(r => r.json()).then(d => {
             btn.disabled = false;
             if (d.success) {
                 reconstructedSid = d.session_id;
-                msg.textContent = d.message + (d.prompt ? "｜AI理解：" + d.prompt : "");
+                msg.textContent = d.message + (d.ai_note ? "｜AI理解：" + d.ai_note : "");
                 loadModel(d.model_url);
                 showPrintCheck(d.print_check);
                 document.getElementById("tuneCard").style.display = "block";
@@ -94,7 +94,7 @@ document.getElementById("repairBtn").addEventListener("click", () => {
     if (!reconstructedSid) { alert("请先完成重建"); return; }
     const btn = document.getElementById("repairBtn");
     const msg = document.getElementById("repairMsg");
-    btn.disabled = true; msg.textContent = "AI 正在修理（去碎片/补洞/水密）...";
+    btn.disabled = true; msg.textContent = "AI 正在修理（去碎片/补洞/水密），约 30-60 秒，请耐心等待...";
     fetch("/api/repair", { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({session_id:reconstructedSid}) })
         .then(r => r.json()).then(d => {
             btn.disabled = false;
@@ -181,4 +181,39 @@ function loadModel(url) {
         currentMesh.position.sub(center);
         scene.add(currentMesh);
     }, undefined, (err) => { console.error(err); });
+}
+
+
+// ===== API settings (stored in browser localStorage) =====
+function getUserKeys() {
+    return {
+        tripo_key: localStorage.getItem("cs_tripo_key") || "",
+        llm_key: localStorage.getItem("cs_llm_key") || "",
+        llm_base: localStorage.getItem("cs_llm_base") || "",
+        llm_model: localStorage.getItem("cs_llm_model") || ""
+    };
+}
+const settingsBtn = document.getElementById("settingsBtn");
+const settingsModal = document.getElementById("settingsModal");
+if (settingsBtn) {
+    settingsBtn.addEventListener("click", () => {
+        const k = getUserKeys();
+        document.getElementById("tripoKeyInput").value = k.tripo_key;
+        document.getElementById("llmKeyInput").value = k.llm_key;
+        document.getElementById("llmBaseInput").value = k.llm_base;
+        document.getElementById("llmModelInput").value = k.llm_model;
+        document.getElementById("settingsMsg").textContent = "";
+        settingsModal.style.display = "flex";
+    });
+    document.getElementById("closeSettingsBtn").addEventListener("click", () => {
+        settingsModal.style.display = "none";
+    });
+    document.getElementById("saveKeysBtn").addEventListener("click", () => {
+        localStorage.setItem("cs_tripo_key", document.getElementById("tripoKeyInput").value.trim());
+        localStorage.setItem("cs_llm_key", document.getElementById("llmKeyInput").value.trim());
+        localStorage.setItem("cs_llm_base", document.getElementById("llmBaseInput").value.trim());
+        localStorage.setItem("cs_llm_model", document.getElementById("llmModelInput").value.trim());
+        document.getElementById("settingsMsg").textContent = "已保存！下次重建将使用你的 Key。";
+        setTimeout(() => { settingsModal.style.display = "none"; }, 900);
+    });
 }

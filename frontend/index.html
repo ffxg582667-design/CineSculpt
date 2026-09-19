@@ -6,7 +6,7 @@
     <title>CineSculpt - 电影场景 3D 打印</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&family=Noto+Sans+SC:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;500;600;700;900&family=Noto+Serif+SC:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
     <script type="importmap">
     {
@@ -20,6 +20,7 @@
 <body>
     <div class="app">
         <header>
+            <button id="settingsBtn" class="settings-btn">⚙ API 设置</button>
             <h1>CineSculpt</h1>
             <p>上传电影场景截图，把感动变成能放在书桌上的实体摆件</p>
         </header>
@@ -83,6 +84,32 @@
             </div>
         </div>
         <footer>CineSculpt - MakerMuse 黑客松 - 把电影记忆实体化</footer>
+    </div>
+    <div id="settingsModal" class="modal" style="display:none;">
+        <div class="modal-box">
+            <h3>API 设置</h3>
+            <p class="modal-tip">填入你自己的 API Key，保存在浏览器本地，不会上传到服务器。不填则用默认配置。</p>
+
+            <div class="modal-section">3D 生成服务</div>
+            <label class="modal-label">3D 生成 API Key</label>
+            <input type="password" id="tripoKeyInput" placeholder="用于图生 3D / 文生 3D">
+            <p class="modal-hint">目前支持 Tripo3D（platform.tripo3d.ai → API Keys）</p>
+
+            <div class="modal-section">AI 文字理解服务（兼容 OpenAI 格式，选填）</div>
+            <label class="modal-label">API 地址 Base URL</label>
+            <input type="text" id="llmBaseInput" placeholder="https://api.deepseek.com">
+            <label class="modal-label">API Key</label>
+            <input type="password" id="llmKeyInput" placeholder="sk-...">
+            <label class="modal-label">模型名称</label>
+            <input type="text" id="llmModelInput" placeholder="deepseek-chat">
+            <p class="modal-hint">支持 DeepSeek / OpenAI / 通义千问 / Kimi 等兼容 OpenAI 格式的服务</p>
+
+            <div class="modal-actions">
+                <button id="saveKeysBtn" class="primary-btn">保存</button>
+                <button id="closeSettingsBtn" class="ghost-btn">关闭</button>
+            </div>
+            <div id="settingsMsg" class="msg"></div>
+        </div>
     </div>
     <script type="module" src="app.js"></script>
 </body>

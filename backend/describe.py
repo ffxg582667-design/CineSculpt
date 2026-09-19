@@ -1,10 +1,12 @@
 # -*- coding: utf-8 -*-
-# use DeepSeek LLM to turn a movie/object name into a 3D generation prompt
+# use an OpenAI-compatible LLM to turn a movie/object name into a 3D generation prompt
+# works with DeepSeek / OpenAI / Qwen / Moonshot etc (any OpenAI-compatible chat API)
 import os
 import json
 import urllib.request
 
-DEEPSEEK_URL = "https://api.deepseek.com/chat/completions"
+DEFAULT_BASE = "https://api.deepseek.com"
+DEFAULT_MODEL = "deepseek-chat"
 
 SYSTEM_PROMPT = (
     "You are an expert at writing prompts for AI 3D model generation. "
@@ -14,13 +16,16 @@ SYSTEM_PROMPT = (
     "Output ONLY the prompt text, no quotes, no explanation."
 )
 
-def build_prompt(source_text):
-    # returns (prompt, used_llm). falls back to the raw text if no key or on error.
-    key = os.environ.get("DEEPSEEK_API_KEY")
+def build_prompt(source_text, api_key=None, base_url=None, model=None):
+    # returns (prompt, used_llm). falls back to raw text if no key or on error.
+    key = api_key or os.environ.get("LLM_API_KEY") or os.environ.get("DEEPSEEK_API_KEY")
     if not key or not source_text or not source_text.strip():
         return source_text or "", False
+    base = (base_url or os.environ.get("LLM_BASE_URL") or DEFAULT_BASE).rstrip("/")
+    mdl = model or os.environ.get("LLM_MODEL") or DEFAULT_MODEL
+    url = base + "/chat/completions"
     payload = {
-        "model": "deepseek-chat",
+        "model": mdl,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": source_text.strip()},
@@ -30,7 +35,7 @@ def build_prompt(source_text):
     }
     try:
         req = urllib.request.Request(
-            DEEPSEEK_URL,
+            url,
             data=json.dumps(payload).encode(),
             headers={"Content-Type": "application/json", "Authorization": "Bearer " + key},
         )
@@ -38,5 +43,5 @@ def build_prompt(source_text):
         text = r["choices"][0]["message"]["content"].strip()
         return text, True
     except Exception as e:
-        print("deepseek prompt build failed:", e)
+        print("llm prompt build failed:", e)
         return source_text, False

@@ -1,19 +1,19 @@
 * { margin:0; padding:0; box-sizing:border-box; }
-body { font-family:"Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI",sans-serif; background:#0f1021; color:#e8e8f0; min-height:100vh; letter-spacing:0.02em; }
+body { font-family:"Cinzel","Noto Serif SC",Georgia,serif; background:#0f1021; color:#e8e8f0; min-height:100vh; letter-spacing:0.02em; }
 .app { max-width:1200px; margin:0 auto; padding:20px; }
 header { text-align:center; padding:28px; }
-header h1 { font-family:"Space Grotesk","Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI",sans-serif; font-weight:900; font-size:42px; letter-spacing:0.12em; background:linear-gradient(90deg,#7b6cff,#c86cff,#6cd8ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 40px rgba(123,108,255,0.3); }
+header h1 { font-family:"Cinzel","Noto Serif SC",Georgia,serif; font-weight:900; font-size:42px; letter-spacing:0.02em; background:linear-gradient(90deg,#7b6cff,#c86cff,#6cd8ff); -webkit-background-clip:text; -webkit-text-fill-color:transparent; text-shadow:0 0 40px rgba(123,108,255,0.3); }
 header p { color:#a0a0c0; margin-top:10px; font-size:14px; font-weight:300; }
 .main { display:flex; gap:20px; align-items:flex-start; }
 .left-panel { width:360px; flex-shrink:0; }
 .right-panel { flex:1; }
 .card { background:rgba(26,27,53,0.7); backdrop-filter:blur(10px); border-radius:14px; padding:20px; margin-bottom:16px; border:1px solid #2a2b50; }
-.card h3 { font-family:"Space Grotesk","Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI",sans-serif; font-weight:500; font-size:14px; letter-spacing:0.08em; margin-bottom:14px; color:#c0c0e0; }
+.card h3 { font-family:"Cinzel","Noto Serif SC",Georgia,serif; font-weight:500; font-size:14px; letter-spacing:0.08em; margin-bottom:14px; color:#c0c0e0; }
 #fileInput { display:none; }
 .upload-label { display:flex; flex-direction:column; align-items:center; gap:6px; padding:28px; border:2px dashed #4a4b80; border-radius:10px; cursor:pointer; transition:.2s; }
 .upload-label:hover { border-color:#7b6cff; background:#20214a; box-shadow:0 0 20px rgba(123,108,255,0.2); }
 .upload-label.has-file { border-color:#4caf50; border-style:solid; }
-.plus { font-family:"Space Grotesk","Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI",sans-serif; font-size:30px; color:#7b6cff; }
+.plus { font-family:"Cinzel","Noto Serif SC",Georgia,serif; font-size:30px; color:#7b6cff; }
 .hint { font-size:12px; color:#7a7a9a; font-weight:300; }
 .thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .thumbs img { width:56px; height:56px; object-fit:cover; border-radius:6px; border:1px solid #3a3b60; }
@@ -27,7 +27,7 @@ header p { color:#a0a0c0; margin-top:10px; font-size:14px; font-weight:300; }
 .tune-row { display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; font-size:13px; }
 .tune-row select, .tune-row input[type=number] { background:#20214a; color:#e8e8f0; border:1px solid #3a3b60; border-radius:6px; padding:6px 10px; font-family:inherit; }
 .tune-row input[type=range] { accent-color:#7b6cff; }
-.tune-row span { color:#7b6cff; font-family:"Space Grotesk","Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI",sans-serif; }
+.tune-row span { color:#7b6cff; font-family:"Cinzel","Noto Serif SC",Georgia,serif; }
 .check { display:block; font-size:13px; margin-bottom:14px; color:#c0c0e0; }
 .msg { margin-top:10px; font-size:13px; color:#8affc0; min-height:16px; font-weight:300; }
 #viewer { width:100%; height:520px; background:radial-gradient(circle at 50% 40%,#1a1c40,#0d0e22); border-radius:14px; border:1px solid #2a2b50; display:flex; align-items:center; justify-content:center; overflow:hidden; }
@@ -35,7 +35,7 @@ header p { color:#a0a0c0; margin-top:10px; font-size:14px; font-weight:300; }
 .print-check { margin-top:14px; padding:14px; background:rgba(26,27,53,0.7); border-radius:10px; font-size:13px; border:1px solid #2a2b50; min-height:20px; font-weight:300; line-height:1.6; }
 .print-check.warn { border-color:#e0a020; color:#ffd580; }
 .print-check.ok { border-color:#4caf50; color:#8affc0; }
-footer { font-family:"Space Grotesk","Space Grotesk","Noto Sans SC",-apple-system,"Segoe UI",sans-serif; text-align:center; padding:24px; color:#5a5a80; font-size:11px; letter-spacing:0.1em; }
+footer { font-family:"Cinzel","Noto Serif SC",Georgia,serif; text-align:center; padding:24px; color:#5a5a80; font-size:11px; letter-spacing:0.1em; }
 
 .thumbs { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; }
 .thumb { position:relative; width:56px; height:56px; }
@@ -50,3 +50,26 @@ footer { font-family:"Space Grotesk","Space Grotesk","Noto Sans SC",-apple-syste
 #sourceInput { width:100%; padding:10px 12px; background:#181935; color:#e8e8f0; border:1px solid #3a3b60; border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
 #sourceInput:focus { border-color:#7b6cff; }
 .source-tip { font-size:11px; color:#7a7a9a; margin-top:6px; line-height:1.5; font-weight:300; }
+
+header { position:relative; }
+.settings-btn { position:absolute; top:20px; right:0; padding:8px 16px; background:#20214a; color:#c0c0e0; border:1px solid #3a3b60; border-radius:8px; cursor:pointer; font-size:13px; font-family:inherit; }
+.settings-btn:hover { border-color:#7b6cff; background:#2d2b60; }
+.modal { position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.6); display:flex; align-items:center; justify-content:center; z-index:100; }
+.modal-box { background:#1a1b35; border:1px solid #3a3b60; border-radius:14px; padding:28px; width:420px; max-width:90%; }
+.modal-box h3 { font-size:18px; margin-bottom:12px; color:#fff; }
+.modal-tip { font-size:12px; color:#8a8ab0; margin-bottom:18px; line-height:1.6; font-weight:300; }
+.modal-label { display:block; font-size:13px; color:#c0c0e0; margin-bottom:6px; margin-top:14px; }
+.modal-box input { width:100%; padding:10px 12px; background:#181935; color:#e8e8f0; border:1px solid #3a3b60; border-radius:8px; font-size:13px; font-family:inherit; outline:none; }
+.modal-box input:focus { border-color:#7b6cff; }
+.modal-hint { font-size:11px; color:#7a7a9a; margin-top:4px; font-weight:300; }
+.modal-actions { display:flex; gap:10px; margin-top:20px; }
+.ghost-btn { flex:1; padding:12px; background:transparent; color:#c0c0e0; border:1px solid #3a3b60; border-radius:8px; cursor:pointer; font-size:14px; font-family:inherit; }
+.ghost-btn:hover { border-color:#7b6cff; }
+.modal-actions .primary-btn { flex:1; margin-top:0; }
+
+/* form elements: keep readable sans-serif (keys/numbers), not the decorative serif */
+input, select, textarea, button { font-family:"Noto Sans SC",-apple-system,"Segoe UI",sans-serif; }
+/* but keep decorative headings using the gothic serif */
+header h1, .card h3, .modal-box h3, footer, .modal-section { font-family:"Cinzel","Noto Serif SC",Georgia,serif; }
+
+.modal-section { font-size:13px; color:#7b6cff; letter-spacing:0.05em; margin-top:20px; margin-bottom:8px; padding-bottom:6px; border-bottom:1px solid #2a2b50; }

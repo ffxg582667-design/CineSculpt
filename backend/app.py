@@ -63,25 +63,20 @@ def api_reconstruct():
     mode = data.get("mode", "hero")
     keep_subject = data.get("keep_subject", mode == "hero")
     source_text = (data.get("source_text") or "").strip()
+    tripo_key = (data.get("tripo_key") or "").strip() or None
+    llm_key = (data.get("llm_key") or data.get("deepseek_key") or "").strip() or None
+    llm_base = (data.get("llm_base") or "").strip() or None
+    llm_model = (data.get("llm_model") or "").strip() or None
     if sid not in SESSIONS:
         return jsonify({"error": "会话不存在，请重新上传"}), 404
-    # ROUTE B: if user provided a source description, use DeepSeek prompt + text-to-3D
+    # NEW: image is always primary. source_text is auxiliary -> only an "AI understanding" note.
+    ai_note = ""
     if source_text:
         try:
-            prompt, used_llm = describe.build_prompt(source_text)
-            model_path, source = reconstruct.reconstruct_from_text(prompt)
-            out_glb = os.path.join(OUTPUT, sid + ".glb")
-            m = mesh_ops.load_mesh(model_path)
-            m.export(out_glb)
-            SESSIONS[sid]["model"] = out_glb
-            chk = mesh_ops.print_check(m)
-            if source == "real":
-                msg = "基于描述生成完成"
-            else:
-                msg = "已用占位模型演示（未配置重建 API）"
-            return jsonify({"success": True, "session_id": sid, "model_url": "/api/model/" + sid, "source": source, "print_check": chk, "message": msg, "prompt": prompt})
+            ai_note, _ = describe.build_prompt(source_text, api_key=llm_key, base_url=llm_base, model=llm_model)
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            print("ai note build failed:", e)
+            ai_note = ""
     images = SESSIONS[sid]["images"]
     if keep_subject:
         cut = []
@@ -98,14 +93,15 @@ def api_reconstruct():
             for img in images:
                 rel = os.path.relpath(img, UPLOAD).replace(os.sep, "/")
                 public_urls.append(public_base + "/api/rawimg/" + rel)
-        model_path, source = reconstruct.reconstruct(images, mode=mode, public_image_urls=public_urls)
+        model_path, source = reconstruct.reconstruct(images, mode=mode, public_image_urls=public_urls, api_key=tripo_key)
         out_glb = os.path.join(OUTPUT, sid + ".glb")
         m = mesh_ops.load_mesh(model_path)
+        m = mesh_ops.normalize_size(m)
         m.export(out_glb)
         SESSIONS[sid]["model"] = out_glb
         chk = mesh_ops.print_check(m)
         msg = "重建完成" if source == "real" else "已用占位模型演示（未配置重建 API）"
-        return jsonify({"success": True, "session_id": sid, "model_url": "/api/model/" + sid, "source": source, "print_check": chk, "message": msg})
+        return jsonify({"success": True, "session_id": sid, "model_url": "/api/model/" + sid, "source": source, "print_check": chk, "message": msg, "ai_note": ai_note})
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -151,7 +147,7 @@ def api_repair():
 @app.route("/api/status")
 def api_status():
     import os as _os
-    return jsonify({"tripo_key_configured": bool(_os.environ.get("TRIPO_API_KEY"))})
+    return jsonify({"tripo_key_configured": bool(_os.environ.get("TRIPO_API_KEY")), "deepseek_key_configured": bool(_os.environ.get("DEEPSEEK_API_KEY"))})
 
 
 @app.route("/api/rawimg/<path:relpath>")
@@ -188,6 +184,7 @@ def api_download(sid):
     return jsonify({"error": "STL 不存在"}), 404
 
 if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5001))
     print("=== CineSculpt backend ===")
-    print("open: http://localhost:5001")
-    app.run(host="0.0.0.0", port=5001, debug=False, threaded=True)
+    print("open: http://localhost:%d" % port)
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)

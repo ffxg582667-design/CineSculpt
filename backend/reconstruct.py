@@ -22,9 +22,9 @@ def get_fallback_model_path():
         _make_placeholder_model().export(path)
     return path
 
-def reconstruct(image_paths, mode="hero", public_image_urls=None):
-    # priority: Tripo3D -> fallback placeholder
-    tripo_key = os.environ.get("TRIPO_API_KEY")
+def reconstruct(image_paths, mode="hero", public_image_urls=None, api_key=None):
+    # priority: user-provided key -> server env key -> fallback placeholder
+    tripo_key = api_key or os.environ.get("TRIPO_API_KEY")
     if tripo_key:
         try:
             return _reconstruct_tripo(image_paths, tripo_key), "real"

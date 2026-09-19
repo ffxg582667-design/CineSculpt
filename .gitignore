@@ -5,9 +5,11 @@ start.bat
 uploads/
 output/
 models/
+demo_models/
 
 # tunnel log (contains public url)
 tunnel.log
+public_url.txt
 
 # python cache
 __pycache__/

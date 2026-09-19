@@ -9,6 +9,14 @@ MIN_FEATURE_MM = 0.5
 def load_mesh(path):
     return trimesh.load(path, force="mesh")
 
+def normalize_size(mesh, target_mm=80.0):
+    # scale model so its largest dimension is target_mm (fixes 1mm tiny models). cheap op.
+    m = mesh.copy()
+    extent = float(max(m.extents)) if len(m.faces) > 0 else 0.0
+    if extent > 0:
+        m.apply_scale(target_mm / extent)
+    return m
+
 def add_base(mesh, shape="cylinder"):
     bounds = mesh.bounds
     size = bounds[1] - bounds[0]
@@ -46,8 +54,8 @@ def repair(mesh, return_report=False):
     report = {"holes_before": 0, "components_removed": 0, "watertight": False}
     # 0. pre-simplify heavy meshes first, so all later steps are fast (avoids freezing)
     try:
-        if len(m.faces) > 8000:
-            m = m.simplify_quadric_decimation(8000)
+        if len(m.faces) > 5000:
+            m = m.simplify_quadric_decimation(5000)
     except Exception as e:
         print("pre-simplify failed:", e)
     # 1. merge duplicate vertices and remove degenerate/duplicate faces
@@ -82,36 +90,23 @@ def repair(mesh, return_report=False):
         trimesh.repair.fill_holes(m)
     except Exception as e:
         print("repair step failed:", e)
-    report["watertight"] = bool(m.is_watertight)
+    # lightweight watertight pass: multiple rounds of hole filling (low memory, no voxel)
     report["voxel_remeshed"] = False
-    # only voxel-remesh when the mesh is badly broken (many boundary holes).
-    # use a low resolution (64) so it stays fast and does not freeze the machine.
-    holes = report.get("holes_before", 0)
-    if not m.is_watertight and holes > 50:
-        try:
-            # normalize size first: tiny models (e.g. 1mm) break voxelization.
-            # scale so the largest dimension is ~100 units, voxelize, then keep it.
-            extent = float(max(m.extents))
-            norm_scale = 100.0 / extent if extent > 0 else 1.0
-            m.apply_scale(norm_scale)
-            pitch = 100.0 / 64.0  # fixed pitch on normalized model = stable & fast
-            vox = m.voxelized(pitch=pitch).fill()
-            remeshed = vox.marching_cubes
-            if remeshed is not None and len(remeshed.faces) > 0:
-                # simplification is optional polish; never let it break the watertight result
-                try:
-                    if len(remeshed.faces) > 20000:
-                        remeshed = remeshed.simplify_quadric_decimation(20000)
-                except Exception as se:
-                    print("post-voxel simplify skipped:", se)
-                remeshed.merge_vertices()
-                trimesh.repair.fix_normals(remeshed)
-                m = remeshed
-                report["voxel_remeshed"] = True
-                report["watertight"] = bool(m.is_watertight)
-        except Exception as e:
-            print("voxel remesh failed:", repr(e))
-            report["voxel_error"] = str(e)
+    try:
+        for _ in range(3):
+            if m.is_watertight:
+                break
+            trimesh.repair.fill_holes(m)
+            trimesh.repair.fix_winding(m)
+        trimesh.repair.fix_normals(m)
+    except Exception as e:
+        print("lightweight fill failed:", e)
+    report["watertight"] = bool(m.is_watertight)
+    report["holes_after"] = 0
+    try:
+        report["holes_after"] = int(len(m.facets_boundary))
+    except Exception:
+        pass
     if return_report:
         return m, report
     return m
