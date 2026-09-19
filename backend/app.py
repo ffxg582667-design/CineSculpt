@@ -25,7 +25,7 @@ os.makedirs(OUTPUT, exist_ok=True)
 ALLOWED = {"png", "jpg", "jpeg", "bmp", "tiff", "tif"}
 SESSIONS = {}
 JOBS = {}  # sid -> {"status": "processing"|"done"|"error", ...}
-APP_VERSION = "20260919-4"  # 用于在 /api/status 确认最新代码已部署
+APP_VERSION = "20260919-5"  # 用于在 /api/status 确认最新代码已部署（含多图失败兜底+日志接口）
 
 # 重启诊断：boot_count 在同容器内递增；若变回 1，说明容器被整体替换（磁盘被清空）
 BOOT_TIME = time.strftime("%Y-%m-%d %H:%M:%S")
@@ -206,6 +206,23 @@ def api_status():
     return jsonify({"version": APP_VERSION, "boot_time": BOOT_TIME, "boot_count": BOOT_COUNT,
         "tripo_key_configured": bool(_os.environ.get("TRIPO_API_KEY")),
         "deepseek_key_configured": bool(_os.environ.get("DEEPSEEK_API_KEY"))})
+
+@app.route("/api/worker_log")
+def api_worker_log():
+    # 诊断用：读取某次生成任务的子进程日志与结果文件，便于定位真实报错（如 Tripo 多图接口拒绝）。
+    sid = request.args.get("session_id")
+    if not sid:
+        return jsonify({"error": "缺少 session_id"}), 400
+    log_path = os.path.join(OUTPUT, sid + "_worker.log")
+    job_path = os.path.join(OUTPUT, sid + "_job.json")
+    log = open(log_path, encoding="utf-8", errors="replace").read() if os.path.exists(log_path) else ""
+    job = None
+    if os.path.exists(job_path):
+        try:
+            job = json.load(open(job_path, encoding="utf-8"))
+        except Exception:
+            pass
+    return jsonify({"worker_log": log, "job": job, "boot_time": BOOT_TIME, "boot_count": BOOT_COUNT})
 
 
 @app.route("/api/rawimg/<path:relpath>")

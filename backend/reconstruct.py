@@ -28,15 +28,16 @@ def reconstruct(image_paths, mode="hero", public_image_urls=None, api_key=None):
     tripo_key = api_key or os.environ.get("TRIPO_API_KEY")
     if tripo_key:
         try:
-            return _reconstruct_tripo(image_paths, tripo_key), "real", ""
+            model_path, note = _reconstruct_tripo(image_paths, tripo_key)
+            return model_path, "real", ("重建完成" + note)
         except Exception as e:
             # Key 失效/额度耗尽/网络异常时优雅降级为占位模型，保证演示流程不中断
-            print("Tripo 真实生成失败，降级为占位模型:", e, flush=True)
-            return get_fallback_model_path(), "fallback", "重建 API 调用失败（" + str(e)[:120] + "），已降级为占位模型演示"
+            print("Tripo 真实生成失败，降级为占位模型:", repr(e), flush=True)
+            return get_fallback_model_path(), "fallback", "重建 API 调用失败（" + str(e)[:500] + "），已降级为占位模型演示"
     return get_fallback_model_path(), "fallback", "未配置重建 API（TRIPO_API_KEY），已用占位模型演示"
 
 def _reconstruct_tripo(image_paths, api_key):
-    # use official Tripo3D SDK. multi-image for >=2 imgs, else single image.
+    # use official Tripo3D SDK. returns (model_path, note).
     return asyncio.run(_tripo_async(image_paths, api_key))
 
 async def _tripo_async(image_paths, api_key):
@@ -45,10 +46,18 @@ async def _tripo_async(image_paths, api_key):
         imgs = [p for p in image_paths if os.path.exists(p)]
         if not imgs:
             raise Exception("no valid image")
-        # 多图（>=2 张）用 multiview_to_model 融合各角度；单图才用 image_to_model。
+        note = ""
+        # 多图（>=2 张）优先走 multiview_to_model 融合各角度；单图才用 image_to_model。
         # 之前只用 imgs[0]，导致模型只含第一张图内容（只有半边）。
         if len(imgs) >= 2:
-            task_id = await client.multiview_to_model(images=imgs)
+            try:
+                task_id = await client.multiview_to_model(images=imgs)
+            except Exception as e:
+                # 多图融合失败（常见于账号等级 / 图片视角 / 数量限制），退回单图重建首图，
+                # 保证仍能产出真实模型，并在 note 中记录真实原因便于排查。
+                print("multiview_to_model failed, fallback to single image:", repr(e), flush=True)
+                note = "（多图融合失败：" + str(e)[:200] + "，已用首图单图重建）"
+                task_id = await client.image_to_model(image=imgs[0])
         else:
             task_id = await client.image_to_model(image=imgs[0])
         task = await client.wait_for_task(task_id, polling_interval=3.0, timeout=300, verbose=True)
@@ -68,7 +77,7 @@ async def _tripo_async(image_paths, api_key):
                     model_path = v; break
         if not model_path:
             raise Exception("no model file downloaded")
-        return model_path
+        return model_path, note
 
 def reconstruct_from_text(prompt, api_key=None):
     # text-to-3D via Tripo. returns (model_path, source).
