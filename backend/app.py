@@ -25,9 +25,25 @@ os.makedirs(OUTPUT, exist_ok=True)
 ALLOWED = {"png", "jpg", "jpeg", "bmp", "tiff", "tif"}
 SESSIONS = {}
 JOBS = {}  # sid -> {"status": "processing"|"done"|"error", ...}
+APP_VERSION = "20260919-3"  # 用于在 /api/status 确认最新代码已部署
 
 def allowed(fn):
     return "." in fn and fn.rsplit(".", 1)[1].lower() in ALLOWED
+
+def get_session_images(sid):
+    """优先取内存会话；进程重启/重新部署导致内存丢失时，从磁盘恢复。
+    上传的图片本身就落在 uploads/<sid>/ 目录，重启后仍在，可直接重建会话。"""
+    sess = SESSIONS.get(sid)
+    if sess and sess.get("images"):
+        return sess["images"]
+    sdir = os.path.join(UPLOAD, sid)
+    if os.path.isdir(sdir):
+        imgs = [os.path.join(sdir, f) for f in sorted(os.listdir(sdir))
+                if os.path.isfile(os.path.join(sdir, f)) and allowed(f)]
+        if imgs:
+            SESSIONS[sid] = {"images": imgs}
+            return imgs
+    return None
 
 @app.route("/")
 def index():
@@ -71,12 +87,17 @@ def api_reconstruct():
     llm_key = (data.get("llm_key") or "").strip()
     llm_base = (data.get("llm_base") or "").strip()
     llm_model = (data.get("llm_model") or "").strip()
-    if sid not in SESSIONS:
+    # 校验 sid 格式（防路径穿越），并支持重启后从磁盘恢复会话
+    try:
+        uuid.UUID(str(sid))
+    except (ValueError, TypeError, AttributeError):
+        return jsonify({"error": "会话不存在，请重新上传"}), 404
+    images = get_session_images(sid)
+    if not images:
         return jsonify({"error": "会话不存在，请重新上传"}), 404
     # 关键修复：在独立子进程中执行耗内存的生成任务。
     # 主 Web 进程保持轻量，随时响应平台健康检查，绝不会因生成任务被重启。
     # 即使子进程因内存被系统杀掉，Web 服务仍在线，前端会显示“生成失败”而非整站崩溃。
-    images = SESSIONS[sid]["images"]
     result_path = os.path.join(OUTPUT, sid + "_job.json")
     if os.path.exists(result_path):
         os.remove(result_path)
@@ -156,7 +177,9 @@ def api_repair():
 @app.route("/api/status")
 def api_status():
     import os as _os
-    return jsonify({"tripo_key_configured": bool(_os.environ.get("TRIPO_API_KEY")), "deepseek_key_configured": bool(_os.environ.get("DEEPSEEK_API_KEY"))})
+    return jsonify({"version": APP_VERSION,
+        "tripo_key_configured": bool(_os.environ.get("TRIPO_API_KEY")),
+        "deepseek_key_configured": bool(_os.environ.get("DEEPSEEK_API_KEY"))})
 
 
 @app.route("/api/rawimg/<path:relpath>")

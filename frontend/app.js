@@ -48,14 +48,14 @@ function renderThumbs() {
     }
 }
 
-function uploadSession() {
+function uploadSession(cb) {
     const fd = new FormData();
     pickedFiles.forEach(f => fd.append("files", f));
     fetch("/api/upload", { method:"POST", body:fd })
         .then(r => r.json()).then(d => {
-            if (d.success) { sessionId = d.session_id; }
-            else alert(d.error);
-        });
+            if (d.success) { sessionId = d.session_id; if (cb) cb(); }
+            else { alert(d.error); if (cb) cb(true); }
+        }).catch(() => { if (cb) cb(true); });
 }
 
 document.getElementById("heroBtn").addEventListener("click", () => setMode("hero"));
@@ -67,17 +67,24 @@ function setMode(m) {
 }
 
 document.getElementById("reconstructBtn").addEventListener("click", () => {
-    if (!sessionId) { alert("请先上传图片"); return; }
+    if (pickedFiles.length === 0) { alert("请先上传图片"); return; }
     const btn = document.getElementById("reconstructBtn");
     const msg = document.getElementById("reconMsg");
-    btn.disabled = true; msg.textContent = "任务已提交，AI 生成中（通常 1-2 分钟），请勿刷新页面...";
+    btn.disabled = true; msg.textContent = "正在上传图片...";
+    // 每次重建前重新上传：确保会话在当前服务实例上有效，
+    // 彻底避免服务器重启/重新部署导致的「会话不存在，请重新上传」。
+    uploadSession(() => startReconstruct(btn, msg));
+});
+
+function startReconstruct(btn, msg) {
+    msg.textContent = "任务已提交，AI 生成中（通常 1-2 分钟），请勿刷新页面...";
     fetch("/api/reconstruct", { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ session_id:sessionId, mode:mode, keep_subject: mode==="hero", source_text: (document.getElementById("sourceInput") ? document.getElementById("sourceInput").value : ""), tripo_key: getUserKeys().tripo_key, llm_key: getUserKeys().llm_key, llm_base: getUserKeys().llm_base, llm_model: getUserKeys().llm_model }) })
         .then(r => r.json()).then(d => {
             if (d.success) { pollReconstruct(btn, msg, 0); }
             else { btn.disabled = false; msg.textContent = "错误: " + d.error; }
         }).catch(e => { btn.disabled=false; msg.textContent="重建失败，请重试"; });
-});
+}
 
 function pollReconstruct(btn, msg, tries) {
     if (tries > 200) { btn.disabled = false; msg.textContent = "等待超时，请重试"; return; }
