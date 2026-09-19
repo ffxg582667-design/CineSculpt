@@ -4,7 +4,7 @@
 
 上传电影截图 → AI 抠出主体 → 生成 3D 模型 → 网页里旋转查看 → 打印前微调与可打印性检测 → 导出 STL 直接送进 3D 打印机。
 
-在线体验（部署后填写）：`https://xxx.onrender.com`
+在线体验：`https://cinesculpt.onrender.com`
 
 ---
 
