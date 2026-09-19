@@ -45,8 +45,12 @@ async def _tripo_async(image_paths, api_key):
         imgs = [p for p in image_paths if os.path.exists(p)]
         if not imgs:
             raise Exception("no valid image")
-        # use single-image reconstruction (most reliable). multiview API params are strict.
-        task_id = await client.image_to_model(image=imgs[0])
+        # 多图（>=2 张）用 multiview_to_model 融合各角度；单图才用 image_to_model。
+        # 之前只用 imgs[0]，导致模型只含第一张图内容（只有半边）。
+        if len(imgs) >= 2:
+            task_id = await client.multiview_to_model(images=imgs)
+        else:
+            task_id = await client.image_to_model(image=imgs[0])
         task = await client.wait_for_task(task_id, polling_interval=3.0, timeout=300, verbose=True)
         if task.status != TaskStatus.SUCCESS:
             raise Exception("tripo task not success: " + str(task.status))
