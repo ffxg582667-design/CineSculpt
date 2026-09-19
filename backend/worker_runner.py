@@ -2,8 +2,36 @@
 # 独立子进程：执行耗内存/耗时的 3D 生成任务。
 # 与主 Web 进程解耦，即使本进程因 OOM 被系统杀掉，Web 服务也绝不宕机。
 import sys, os, json, traceback
+# 必须在 numpy/trimesh 导入前设置：限制 BLAS/OpenMP 线程栈，显著降低内存与线程开销
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("OPENBLAS_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import reconstruct, mesh_ops, segment, describe
+
+MAX_IMG_DIM = 1600  # 上传给 Tripo 前的最大边长，控制内存与上传体积
+
+def downscale(paths):
+    """用 Pillow 把过大图片等比缩到 MAX_IMG_DIM 内，返回新文件路径列表（失败时退回原图）。"""
+    from PIL import Image
+    out = []
+    for p in paths:
+        try:
+            im = Image.open(p)
+            w, h = im.size
+            if max(w, h) > MAX_IMG_DIM:
+                im.thumbnail((MAX_IMG_DIM, MAX_IMG_DIM))
+                np_ = os.path.join(os.path.dirname(p), "ds_" + os.path.basename(p))
+                if np_.lower().endswith((".jpg", ".jpeg", ".bmp", ".tif", ".tiff")):
+                    im = im.convert("RGB"); np_ = os.path.splitext(np_)[0] + ".png"
+                im.save(np_)
+                out.append(np_)
+            else:
+                out.append(p)
+        except Exception as e:
+            print("downscale failed for", p, e, flush=True)
+            out.append(p)
+    return out
 
 def main():
     sid        = sys.argv[1]
@@ -33,7 +61,7 @@ def main():
             except Exception as e:
                 print("ai note build failed:", e, flush=True)
                 ai_note = ""
-        imgs = image_paths
+        imgs = downscale(image_paths)
         if keep_subject:
             cut = []
             for i, img in enumerate(imgs):

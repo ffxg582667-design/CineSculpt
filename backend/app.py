@@ -8,10 +8,9 @@ import time
 import subprocess
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
-import reconstruct
-import mesh_ops
-import segment
-import describe
+# 内存优化：不再在 Web 进程顶层 import reconstruct/segment/describe/mesh_ops——
+# 它们会连带加载 numpy/trimesh/scipy（约 100-150MB）。这些模块只在生成子进程里用，
+# Web 进程仅在微调/修理接口时才惰性加载 mesh_ops，避免 Web+子进程双份内存挤爆 512MB。
 
 app = Flask(__name__)
 CORS(app)
@@ -162,6 +161,7 @@ def api_reconstruct_status():
 
 @app.route("/api/tune", methods=["POST"])
 def api_tune():
+    import mesh_ops
     data = request.get_json(force=True)
     sid = data.get("session_id")
     glb_path = os.path.join(OUTPUT, sid + ".glb") if sid else None
@@ -187,6 +187,7 @@ def api_tune():
 
 @app.route("/api/repair", methods=["POST"])
 def api_repair():
+    import mesh_ops
     data = request.get_json(force=True)
     sid = data.get("session_id")
     glb_path = os.path.join(OUTPUT, sid + ".glb") if sid else None
@@ -223,6 +224,7 @@ def api_model(sid):
 
 @app.route("/api/export", methods=["POST"])
 def api_export():
+    import mesh_ops
     data = request.get_json(force=True)
     sid = data.get("session_id")
     glb_path = os.path.join(OUTPUT, sid + ".glb") if sid else None

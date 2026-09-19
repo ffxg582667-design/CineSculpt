@@ -3,7 +3,7 @@
 import os
 import uuid
 import asyncio
-import trimesh
+# trimesh 改为惰性导入（仅占位模型需要），缩短子进程启动时的内存峰值
 
 MODELS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "models")
 OUTPUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "output")
@@ -11,6 +11,7 @@ os.makedirs(MODELS_DIR, exist_ok=True)
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 def _make_placeholder_model():
+    import trimesh
     sphere = trimesh.creation.icosphere(subdivisions=3, radius=1.0)
     box = trimesh.creation.box(extents=(1.2, 1.2, 0.4))
     box.apply_translation((0, 0, -1.0))
