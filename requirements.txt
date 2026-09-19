@@ -2,9 +2,17 @@ flask>=3.0
 flask-cors>=5.0
 numpy>=1.26
 Pillow>=10.0
-trimesh>=4.0
-tripo3d>=1.0
 gunicorn>=22.0
+
+# 网格处理核心
+trimesh>=4.0
+# trimesh 可选依赖（必需）：简化 / 补洞 / 连通体拆分
+fast-simplification>=0.1
+scipy>=1.11
+networkx>=3.0
+
+# 3D 重建
+tripo3d>=1.0
 
 # rembg 用于「抠主体」(u2net 模型, 约 180MB, 内存占用较大)。
 # 若 Render 免费档(512MB) 部署报 Out of memory，删掉下面这行重新部署即可：
