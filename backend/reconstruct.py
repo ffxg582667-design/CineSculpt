@@ -51,7 +51,16 @@ async def _tripo_async(image_paths, api_key):
         # 之前只用 imgs[0]，导致模型只含第一张图内容（只有半边）。
         if len(imgs) >= 2:
             try:
-                task_id = await client.multiview_to_model(images=imgs)
+                # 官方 API 要求：multiview 的 files 必须恰好 4 个槽位，顺序 [front, left, back, right]，
+                # 每个槽位为 {"type":"jpg","file_token":...}，不用的视角用空对象 {} 占位，front 不能空。
+                # SDK 的 multiview_to_model 只会原样拼 images 数组（不足 4 个必报 [1004] 参数无效），
+                # 因此这里绕开它，手工按官方格式构造。
+                files = [{}, {}, {}, {}]
+                for i, p in enumerate(imgs[:4]):
+                    tok = await client._image_to_file_content(p)
+                    if tok:
+                        files[i] = tok
+                task_id = await client.create_task({"type": "multiview_to_model", "files": files})
             except Exception as e:
                 # 多图融合失败（常见于账号等级 / 图片视角 / 数量限制），退回单图重建首图，
                 # 保证仍能产出真实模型，并在 note 中记录真实原因便于排查。

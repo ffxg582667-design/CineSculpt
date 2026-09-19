@@ -25,7 +25,7 @@ os.makedirs(OUTPUT, exist_ok=True)
 ALLOWED = {"png", "jpg", "jpeg", "bmp", "tiff", "tif"}
 SESSIONS = {}
 JOBS = {}  # sid -> {"status": "processing"|"done"|"error", ...}
-APP_VERSION = "20260920-1"  # 用于在 /api/status 确认最新代码已部署（修复成功时多图回退原因被覆盖丢弃）
+APP_VERSION = "20260920-2"  # 用于在 /api/status 确认最新代码已部署（修复成功时多图回退原因被覆盖丢弃）
 
 # 重启诊断：boot_count 在同容器内递增；若变回 1，说明容器被整体替换（磁盘被清空）
 BOOT_TIME = time.strftime("%Y-%m-%d %H:%M:%S")
