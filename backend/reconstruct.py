@@ -26,10 +26,8 @@ def reconstruct(image_paths, mode="hero", public_image_urls=None, api_key=None):
     # priority: user-provided key -> server env key -> fallback placeholder
     tripo_key = api_key or os.environ.get("TRIPO_API_KEY")
     if tripo_key:
-        try:
-            return _reconstruct_tripo(image_paths, tripo_key), "real"
-        except Exception as e:
-            print("Tripo3D reconstruct failed, fallback:", e)
+        # 有 Key 时不再静默降级：把真实错误抛出，便于排查（如鉴权失败/额度耗尽）
+        return _reconstruct_tripo(image_paths, tripo_key), "real"
     return get_fallback_model_path(), "fallback"
 
 def _reconstruct_tripo(image_paths, api_key):

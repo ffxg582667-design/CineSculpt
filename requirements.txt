@@ -11,10 +11,8 @@ fast-simplification>=0.1
 scipy>=1.11
 networkx>=3.0
 
-# 3D 重建
-tripo3d>=0.4.0
+# 3D 重建（锁定版本，保证与本地一致）
+tripo3d==0.4.2
 
-# rembg 用于「抠主体」(u2net 模型, 约 180MB, 内存占用较大)。
-# 若 Render 免费档(512MB) 部署报 Out of memory，删掉下面这行重新部署即可：
-# 应用会自动降级为「不抠图，直接用原图重建」，其余功能不受影响。
-rembg>=2.0
+# rembg(u2net 抠图, 约 180MB) 已在云端移除：免费档 512MB 内存会被 OOM 杀进程。
+# segment.py 已做优雅降级——import 失败时自动退回原图重建，其余功能不受影响。

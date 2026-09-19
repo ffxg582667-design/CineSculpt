@@ -19,7 +19,7 @@
 | 功能 | 说明 |
 | --- | --- |
 | 多图上传 | 支持 1-5 张同场景不同角度截图（JPG/PNG/BMP/TIFF） |
-| 主体提取 | rembg (u2net) 智能抠图 + alpha matting，合成白底，显著提升重建质量 |
+| 主体提取 | rembg (u2net) 智能抠图（本地启用）；云端免费档内存受限自动降级为「原图重建」 |
 | 3D 重建 | 调用 Tripo3D image-to-model 真实生成；未配置 Key 时自动降级为占位模型，保证流程可演示 |
 | 场景理解 | 可选接入 DeepSeek，把剧情/原著描述转成「AI 理解笔记」辅助重建 |
 | 3D 预览 | Three.js 在线渲染，鼠标拖拽旋转、滚轮缩放 |
@@ -55,7 +55,7 @@ python backend/app.py
 4. 环境变量填 `TRIPO_API_KEY`、`DEEPSEEK_API_KEY`（均可选）
 
 > 注：免费档 15 分钟无访问会休眠，首次打开需等待约 30-50 秒冷启动。
-> 若部署时报内存不足，删除 `requirements.txt` 中的 `rembg` 一行重新部署即可，抠图功能会自动降级为「使用原图」，其余功能不受影响。
+> 云端已默认移除 `rembg`（u2net 抠图，约 180MB）以规避 512MB 内存 OOM，`segment.py` 自动降级为「原图重建」，其余功能不受影响；如需启用抠图可升级付费实例并在 `requirements.txt` 加回 `rembg`。
 
 ## 目录结构
 
