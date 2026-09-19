@@ -83,6 +83,11 @@ def api_reconstruct():
         )
     except Exception as e:
         return jsonify({"error": "无法启动生成任务: " + str(e)}), 500
+    # 写入“处理中”标记，供轮询接口识别（结果文件就绪后由子进程覆盖）
+    try:
+        json.dump({"status": "processing"}, open(result_path, "w"), ensure_ascii=False)
+    except Exception:
+        pass
     return jsonify({"success": True, "status": "processing", "message": "已提交重建任务"})
 
 @app.route("/api/reconstruct_status")
