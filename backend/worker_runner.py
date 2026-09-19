@@ -86,13 +86,14 @@ def main():
                 print("segment failed, use original:", e, flush=True)
 
         # Tripo 已直接产出 GLB，直接作为结果文件，跳过本地 trimesh 后处理以节省内存。
-        model_path, source, fallback_reason = reconstruct.reconstruct(
+        model_path, source, result_msg = reconstruct.reconstruct(
             imgs, mode=mode, public_image_urls=None,
             api_key=tripo_key or os.environ.get("TRIPO_API_KEY"))
         out_glb = os.path.join(OUT, sid + ".glb")
         if os.path.abspath(model_path) != os.path.abspath(out_glb):
             shutil.copy(model_path, out_glb)
-        msg = "重建完成" if source == "real" else fallback_reason
+        # result_msg 已包含完整信息：成功时为「重建完成」(+多图融合失败回退的原因)，降级时为失败原因
+        msg = result_msg
         # 生成阶段不计算 print_check（需要 trimesh）；用户点击『修理/微调』后在 Web 进程里再算。
         write("done", result={"success": True, "session_id": sid,
             "model_url": "/api/model/" + sid, "source": source,
