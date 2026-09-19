@@ -66,6 +66,11 @@ def api_reconstruct():
     mode = data.get("mode", "hero")
     keep_subject = data.get("keep_subject", mode == "hero")
     source_text = (data.get("source_text") or "").strip()
+    # 透传用户在前端填写的密钥（不依赖服务器环境变量，访客可自带 Key）
+    tripo_key = (data.get("tripo_key") or "").strip()
+    llm_key = (data.get("llm_key") or "").strip()
+    llm_base = (data.get("llm_base") or "").strip()
+    llm_model = (data.get("llm_model") or "").strip()
     if sid not in SESSIONS:
         return jsonify({"error": "会话不存在，请重新上传"}), 404
     # 关键修复：在独立子进程中执行耗内存的生成任务。
@@ -78,7 +83,8 @@ def api_reconstruct():
     try:
         subprocess.Popen(
             [sys.executable, os.path.join(BASE, "worker_runner.py"),
-             sid, mode, str(keep_subject), json.dumps(images), source_text],
+             sid, mode, str(keep_subject), json.dumps(images), source_text,
+             tripo_key, llm_key, llm_base, llm_model],
             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
         )
     except Exception as e:
