@@ -3,6 +3,8 @@
 import os
 import uuid
 import json
+import threading
+import traceback
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import reconstruct
@@ -22,6 +24,7 @@ os.makedirs(OUTPUT, exist_ok=True)
 
 ALLOWED = {"png", "jpg", "jpeg", "bmp", "tiff", "tif"}
 SESSIONS = {}
+JOBS = {}  # sid -> {"status": "processing"|"done"|"error", ...}
 
 def allowed(fn):
     return "." in fn and fn.rsplit(".", 1)[1].lower() in ALLOWED
@@ -69,22 +72,42 @@ def api_reconstruct():
     llm_model = (data.get("llm_model") or "").strip() or None
     if sid not in SESSIONS:
         return jsonify({"error": "会话不存在，请重新上传"}), 404
-    # NEW: image is always primary. source_text is auxiliary -> only an "AI understanding" note.
-    ai_note = ""
-    if source_text:
-        try:
-            ai_note, _ = describe.build_prompt(source_text, api_key=llm_key, base_url=llm_base, model=llm_model)
-        except Exception as e:
-            print("ai note build failed:", e)
-            ai_note = ""
+    # 后台任务制：请求立即返回，生成在线程里跑。
+    # 原因：免费云平台会杀掉挂起过久的长请求，导致进程重启、会话丢失（"重建失败"的元凶）。
     images = SESSIONS[sid]["images"]
-    if keep_subject:
-        cut = []
-        for i, img in enumerate(images):
-            out = os.path.join(os.path.dirname(img), "cut_" + str(i) + ".png")
-            cut.append(segment.extract_subject(img, out))
-        images = cut
+    JOBS[sid] = {"status": "processing"}
+    t = threading.Thread(
+        target=_run_reconstruct_job,
+        args=(sid, mode, keep_subject, images, source_text, tripo_key, llm_key, llm_base, llm_model),
+        daemon=True,
+    )
+    t.start()
+    return jsonify({"success": True, "status": "processing", "message": "已提交重建任务"})
+
+@app.route("/api/reconstruct_status")
+def api_reconstruct_status():
+    sid = request.args.get("session_id")
+    job = JOBS.get(sid)
+    if not job:
+        return jsonify({"status": "error", "error": "任务不存在（服务可能已重启），请重新上传并重建"}), 404
+    return jsonify(job)
+
+def _run_reconstruct_job(sid, mode, keep_subject, images, source_text, tripo_key, llm_key, llm_base, llm_model):
+    # NEW: image is always primary. source_text is auxiliary -> only an "AI understanding" note.
     try:
+        ai_note = ""
+        if source_text:
+            try:
+                ai_note, _ = describe.build_prompt(source_text, api_key=llm_key, base_url=llm_base, model=llm_model)
+            except Exception as e:
+                print("ai note build failed:", e, flush=True)
+                ai_note = ""
+        if keep_subject:
+            cut = []
+            for i, img in enumerate(images):
+                out = os.path.join(os.path.dirname(img), "cut_" + str(i) + ".png")
+                cut.append(segment.extract_subject(img, out))
+            images = cut
         # build public image urls (for Meshy) via cloudflare tunnel base url
         public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
         public_urls = None
@@ -93,7 +116,9 @@ def api_reconstruct():
             for img in images:
                 rel = os.path.relpath(img, UPLOAD).replace(os.sep, "/")
                 public_urls.append(public_base + "/api/rawimg/" + rel)
+        print("reconstruct job start, sid=", sid, flush=True)
         model_path, source = reconstruct.reconstruct(images, mode=mode, public_image_urls=public_urls, api_key=tripo_key)
+        print("reconstruct job got model:", model_path, flush=True)
         out_glb = os.path.join(OUTPUT, sid + ".glb")
         m = mesh_ops.load_mesh(model_path)
         m = mesh_ops.normalize_size(m)
@@ -101,9 +126,10 @@ def api_reconstruct():
         SESSIONS[sid]["model"] = out_glb
         chk = mesh_ops.print_check(m)
         msg = "重建完成" if source == "real" else "已用占位模型演示（未配置重建 API）"
-        return jsonify({"success": True, "session_id": sid, "model_url": "/api/model/" + sid, "source": source, "print_check": chk, "message": msg, "ai_note": ai_note})
+        JOBS[sid] = {"status": "done", "result": {"success": True, "session_id": sid, "model_url": "/api/model/" + sid, "source": source, "print_check": chk, "message": msg, "ai_note": ai_note}}
     except Exception as e:
-        return jsonify({"error": str(e)}), 500
+        traceback.print_exc()
+        JOBS[sid] = {"status": "error", "error": str(e)}
 
 @app.route("/api/tune", methods=["POST"])
 def api_tune():

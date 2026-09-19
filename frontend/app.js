@@ -70,22 +70,38 @@ document.getElementById("reconstructBtn").addEventListener("click", () => {
     if (!sessionId) { alert("请先上传图片"); return; }
     const btn = document.getElementById("reconstructBtn");
     const msg = document.getElementById("reconMsg");
-    btn.disabled = true; msg.textContent = "正在重建，请稍候...";
+    btn.disabled = true; msg.textContent = "任务已提交，AI 生成中（通常 1-2 分钟），请勿刷新页面...";
     fetch("/api/reconstruct", { method:"POST", headers:{"Content-Type":"application/json"},
         body: JSON.stringify({ session_id:sessionId, mode:mode, keep_subject: mode==="hero", source_text: (document.getElementById("sourceInput") ? document.getElementById("sourceInput").value : ""), tripo_key: getUserKeys().tripo_key, llm_key: getUserKeys().llm_key, llm_base: getUserKeys().llm_base, llm_model: getUserKeys().llm_model }) })
         .then(r => r.json()).then(d => {
-            btn.disabled = false;
-            if (d.success) {
-                reconstructedSid = d.session_id;
-                msg.textContent = d.message + (d.ai_note ? "｜AI理解：" + d.ai_note : "");
-                loadModel(d.model_url);
-                showPrintCheck(d.print_check);
+            if (d.success) { pollReconstruct(btn, msg, 0); }
+            else { btn.disabled = false; msg.textContent = "错误: " + d.error; }
+        }).catch(e => { btn.disabled=false; msg.textContent="重建失败，请重试"; });
+});
+
+function pollReconstruct(btn, msg, tries) {
+    if (tries > 200) { btn.disabled = false; msg.textContent = "等待超时，请重试"; return; }
+    fetch("/api/reconstruct_status?session_id=" + sessionId)
+        .then(r => r.json()).then(d => {
+            if (d.status === "done") {
+                btn.disabled = false;
+                const r = d.result;
+                reconstructedSid = r.session_id;
+                msg.textContent = r.message + (r.ai_note ? "｜AI理解：" + r.ai_note : "");
+                loadModel(r.model_url);
+                showPrintCheck(r.print_check);
                 document.getElementById("tuneCard").style.display = "block";
                 document.getElementById("manualCard").style.display = "block";
                 document.getElementById("exportCard").style.display = "block";
-            } else { msg.textContent = "错误: " + d.error; }
-        }).catch(e => { btn.disabled=false; msg.textContent="重建失败"; });
-});
+            } else if (d.status === "error") {
+                btn.disabled = false;
+                msg.textContent = "错误: " + d.error;
+            } else {
+                msg.textContent = "AI 生成中... 已等待 " + (tries * 3) + " 秒（Tripo 通常 1-2 分钟）";
+                setTimeout(() => pollReconstruct(btn, msg, tries + 1), 3000);
+            }
+        }).catch(e => { setTimeout(() => pollReconstruct(btn, msg, tries + 1), 3000); });
+}
 
 document.getElementById("simRange").addEventListener("input", e => {
     document.getElementById("simVal").textContent = Math.round(e.target.value*100) + "%";
