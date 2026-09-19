@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
 # CineSculpt backend main service
 import os
+import sys
 import uuid
 import json
-import threading
-import traceback
+import subprocess
 from flask import Flask, request, jsonify, send_file, send_from_directory
 from flask_cors import CORS
 import reconstruct
@@ -66,70 +66,42 @@ def api_reconstruct():
     mode = data.get("mode", "hero")
     keep_subject = data.get("keep_subject", mode == "hero")
     source_text = (data.get("source_text") or "").strip()
-    tripo_key = (data.get("tripo_key") or "").strip() or None
-    llm_key = (data.get("llm_key") or data.get("deepseek_key") or "").strip() or None
-    llm_base = (data.get("llm_base") or "").strip() or None
-    llm_model = (data.get("llm_model") or "").strip() or None
     if sid not in SESSIONS:
         return jsonify({"error": "会话不存在，请重新上传"}), 404
-    # 后台任务制：请求立即返回，生成在线程里跑。
-    # 原因：免费云平台会杀掉挂起过久的长请求，导致进程重启、会话丢失（"重建失败"的元凶）。
+    # 关键修复：在独立子进程中执行耗内存的生成任务。
+    # 主 Web 进程保持轻量，随时响应平台健康检查，绝不会因生成任务被重启。
+    # 即使子进程因内存被系统杀掉，Web 服务仍在线，前端会显示“生成失败”而非整站崩溃。
     images = SESSIONS[sid]["images"]
-    JOBS[sid] = {"status": "processing"}
-    t = threading.Thread(
-        target=_run_reconstruct_job,
-        args=(sid, mode, keep_subject, images, source_text, tripo_key, llm_key, llm_base, llm_model),
-        daemon=True,
-    )
-    t.start()
+    result_path = os.path.join(OUTPUT, sid + "_job.json")
+    if os.path.exists(result_path):
+        os.remove(result_path)
+    try:
+        subprocess.Popen(
+            [sys.executable, os.path.join(BASE, "worker_runner.py"),
+             sid, mode, str(keep_subject), json.dumps(images), source_text],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+    except Exception as e:
+        return jsonify({"error": "无法启动生成任务: " + str(e)}), 500
     return jsonify({"success": True, "status": "processing", "message": "已提交重建任务"})
 
 @app.route("/api/reconstruct_status")
 def api_reconstruct_status():
     sid = request.args.get("session_id")
+    if not sid:
+        return jsonify({"status": "error", "error": "缺少 session_id"}), 400
+    # 优先从结果文件读取（跨进程/跨重启持久）
+    result_path = os.path.join(OUTPUT, sid + "_job.json")
+    if os.path.exists(result_path):
+        try:
+            return jsonify(json.load(open(result_path, encoding="utf-8")))
+        except Exception:
+            pass
+    # 兼容内存态
     job = JOBS.get(sid)
-    if not job:
-        return jsonify({"status": "error", "error": "任务不存在（服务可能已重启），请重新上传并重建"}), 404
-    return jsonify(job)
-
-def _run_reconstruct_job(sid, mode, keep_subject, images, source_text, tripo_key, llm_key, llm_base, llm_model):
-    # NEW: image is always primary. source_text is auxiliary -> only an "AI understanding" note.
-    try:
-        ai_note = ""
-        if source_text:
-            try:
-                ai_note, _ = describe.build_prompt(source_text, api_key=llm_key, base_url=llm_base, model=llm_model)
-            except Exception as e:
-                print("ai note build failed:", e, flush=True)
-                ai_note = ""
-        if keep_subject:
-            cut = []
-            for i, img in enumerate(images):
-                out = os.path.join(os.path.dirname(img), "cut_" + str(i) + ".png")
-                cut.append(segment.extract_subject(img, out))
-            images = cut
-        # build public image urls (for Meshy) via cloudflare tunnel base url
-        public_base = os.environ.get("PUBLIC_BASE_URL", "").rstrip("/")
-        public_urls = None
-        if public_base:
-            public_urls = []
-            for img in images:
-                rel = os.path.relpath(img, UPLOAD).replace(os.sep, "/")
-                public_urls.append(public_base + "/api/rawimg/" + rel)
-        print("reconstruct job start, sid=", sid, flush=True)
-        model_path, source = reconstruct.reconstruct(images, mode=mode, public_image_urls=public_urls, api_key=tripo_key)
-        print("reconstruct job got model:", model_path, flush=True)
-        out_glb = os.path.join(OUTPUT, sid + ".glb")
-        m = mesh_ops.load_mesh(model_path)
-        m = mesh_ops.normalize_size(m)
-        m.export(out_glb)
-        SESSIONS[sid]["model"] = out_glb
-        chk = mesh_ops.print_check(m)
-        msg = "重建完成" if source == "real" else "已用占位模型演示（未配置重建 API）"
-        JOBS[sid] = {"status": "done", "result": {"success": True, "session_id": sid, "model_url": "/api/model/" + sid, "source": source, "print_check": chk, "message": msg, "ai_note": ai_note}}
-    except Exception as e:
-        traceback.print_exc()
-        JOBS[sid] = {"status": "error", "error": str(e)}
+    if job:
+        return jsonify(job)
+    return jsonify({"status": "error", "error": "任务不存在（服务可能已重启），请重新上传并重建"}), 404
 
 @app.route("/api/tune", methods=["POST"])
 def api_tune():
